@@ -350,24 +350,26 @@ npm run prisma:seed      # Seed database
 
 ## 🗺️ Roadmap
 
-### Phase 1 - MVP (Current)
+### Phase 1 - MVP ✅ (COMPLETED)
 - [x] Project setup & infrastructure
 - [x] NestJS backend with modular architecture
 - [x] Docker Compose configuration
-- [x] Prisma ORM with complete schema
-- [x] Authentication module (JWT)
+- [x] Prisma ORM with complete schema (30+ tables)
+- [x] Authentication module (JWT with refresh tokens)
 - [x] Common utilities (guards, decorators, interceptors)
-- [ ] Database migrations
-- [ ] Tenant management module
-- [ ] Menu management module
-- [ ] Order processing module
-- [ ] Payment integration (Iyzico)
-- [ ] Basic loyalty system
+- [x] Tenant management module (CRUD, geolocation, branding)
+- [x] Menu management module (categories, items, customizations)
+- [x] Order processing module (cart, checkout, status tracking)
+- [ ] Database migrations (ready, needs PostgreSQL running)
+- [ ] Payment integration (Iyzico/Stripe)
+- [ ] Loyalty system implementation
 
-### Phase 2 - Mobile App
-- [ ] React Native app setup
+### Phase 2 - Mobile App 🚧 (IN PROGRESS)
+- [x] React Native project structure & documentation
+- [x] Package setup (Navigation, Redux, React Query)
+- [ ] Initialize React Native project
 - [ ] Authentication screens
-- [ ] Coffee shop discovery
+- [ ] Coffee shop discovery (map + list)
 - [ ] Menu browsing & ordering
 - [ ] Order tracking
 - [ ] Loyalty card
