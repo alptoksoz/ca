@@ -1,0 +1,894 @@
+// Prisma Schema for Coffee Shop Super App
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum SubscriptionPlan {
+  TRIAL
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum TenantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  PICKUP
+  DINE_IN
+  DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethodType {
+  CARD
+  APPLE_PAY
+  GOOGLE_PAY
+  WALLET
+  CASH
+}
+
+enum TierLevel {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum NotificationType {
+  ORDER_CONFIRMED
+  ORDER_PREPARING
+  ORDER_READY
+  ORDER_COMPLETED
+  ORDER_CANCELLED
+  LOYALTY_POINTS_EARNED
+  REWARD_AVAILABLE
+  PROMOTION
+  SYSTEM
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_ITEM
+}
+
+// ============================================
+// TENANTS & BRANDING
+// ============================================
+
+model Tenant {
+  id          String   @id @default(uuid())
+  businessName String  @map("business_name")
+  slug        String   @unique
+  email       String
+  phone       String?
+
+  // Address
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city        String?
+  state       String?
+  postalCode  String?  @map("postal_code")
+  country     String   @default("TR")
+
+  // Geolocation
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+
+  // Business info
+  description    String?  @db.Text
+  logoUrl        String?  @map("logo_url")
+  coverImageUrl  String?  @map("cover_image_url")
+  businessHours  Json     @default("{}") @map("business_hours")
+
+  // Subscription
+  subscriptionPlan      SubscriptionPlan @default(TRIAL) @map("subscription_plan")
+  subscriptionStartedAt DateTime?        @map("subscription_started_at")
+  subscriptionEndsAt    DateTime?        @map("subscription_ends_at")
+  trialEndsAt          DateTime?        @map("trial_ends_at")
+
+  // Settings
+  commissionRate Decimal  @default(10.00) @map("commission_rate") @db.Decimal(5, 2)
+  currency       String   @default("TRY")
+  timezone       String   @default("Europe/Istanbul")
+
+  // Status
+  status     TenantStatus @default(PENDING)
+  isActive   Boolean      @default(true) @map("is_active")
+  isVerified Boolean      @default(false) @map("is_verified")
+
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  branding         TenantBranding?
+  staff            TenantStaff[]
+  categories       Category[]
+  menuItems        MenuItem[]
+  customizationGroups CustomizationGroup[]
+  orders           Order[]
+  loyaltyProgram   LoyaltyProgram?
+  userLoyalty      UserLoyalty[]
+  reviews          Review[]
+  rewards          Reward[]
+  promotions       Promotion[]
+
+  @@map("tenants")
+}
+
+model TenantBranding {
+  id       String @id @default(uuid())
+  tenantId String @unique @map("tenant_id")
+
+  // Colors (hex codes)
+  primaryColor     String @default("#6F4E37") @map("primary_color")
+  secondaryColor   String @default("#A0826D") @map("secondary_color")
+  accentColor      String @default("#E6BE8A") @map("accent_color")
+  backgroundColor  String @default("#FFFFFF") @map("background_color")
+  textColor        String @default("#333333") @map("text_color")
+
+  // Typography
+  fontFamily    String  @default("Roboto") @map("font_family")
+  headingFont   String? @map("heading_font")
+
+  // Custom CSS
+  customCss String? @map("custom_css") @db.Text
+
+  // Images
+  logoUrl         String? @map("logo_url")
+  iconUrl         String? @map("icon_url")
+  splashScreenUrl String? @map("splash_screen_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_branding")
+}
+
+model TenantStaff {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  role        String   // 'owner', 'manager', 'barista'
+  permissions Json     @default("[]")
+  isActive    Boolean  @default(true) @map("is_active")
+  hiredAt     DateTime @default(now()) @map("hired_at")
+  terminatedAt DateTime? @map("terminated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("tenant_staff")
+}
+
+// ============================================
+// USERS & AUTHENTICATION
+// ============================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String?  @map("password_hash")
+
+  // Profile
+  firstName   String?   @map("first_name")
+  lastName    String?   @map("last_name")
+  avatarUrl   String?   @map("avatar_url")
+  dateOfBirth DateTime? @map("date_of_birth")
+
+  // Preferences
+  preferredLanguage        String @default("tr") @map("preferred_language")
+  notificationPreferences  Json   @default("{}") @map("notification_preferences")
+
+  // Auth
+  role                     UserRole @default(CUSTOMER)
+  emailVerified           Boolean  @default(false) @map("email_verified")
+  phoneVerified           Boolean  @default(false) @map("phone_verified")
+  emailVerificationToken  String?  @map("email_verification_token")
+  phoneVerificationCode   String?  @map("phone_verification_code")
+  resetPasswordToken      String?  @map("reset_password_token")
+  resetPasswordExpires    DateTime? @map("reset_password_expires")
+
+  // OAuth
+  googleId   String? @map("google_id")
+  appleId    String? @map("apple_id")
+  facebookId String? @map("facebook_id")
+
+  // Status
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  devices            UserDevice[]
+  refreshTokens      RefreshToken[]
+  tenantStaff        TenantStaff[]
+  orders             Order[]
+  payments           Payment[]
+  savedPaymentMethods SavedPaymentMethod[]
+  wallet             UserWallet?
+  loyalties          UserLoyalty[]
+  reviews            Review[]
+  menuItemReviews    MenuItemReview[]
+  rewardRedemptions  RewardRedemption[]
+  notifications      Notification[]
+  promotionUsages    PromotionUsage[]
+
+  @@map("users")
+}
+
+model UserDevice {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  deviceToken String  @map("device_token")
+  deviceType  String  @map("device_type") // 'ios', 'android'
+  deviceName  String? @map("device_name")
+  appVersion  String? @map("app_version")
+  osVersion   String? @map("os_version")
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@map("user_devices")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  deviceId  String?   @map("device_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice? @relation(fields: [deviceId], references: [id])
+
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// MENU MANAGEMENT
+// ============================================
+
+model Category {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  name        String
+  slug        String
+  description String? @db.Text
+  imageUrl    String? @map("image_url")
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  menuItems MenuItem[]
+
+  @@unique([tenantId, slug])
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  categoryId  String? @map("category_id")
+
+  name        String
+  slug        String
+  description String? @db.Text
+  imageUrl    String? @map("image_url")
+
+  // Pricing
+  basePrice Decimal @map("base_price") @db.Decimal(10, 2)
+  currency  String  @default("TRY")
+
+  // Nutritional info
+  calories Int?     @db.Integer
+  protein  Decimal? @db.Decimal(5, 2)
+  carbs    Decimal? @db.Decimal(5, 2)
+  fat      Decimal? @db.Decimal(5, 2)
+  caffeine Int?     @db.Integer
+
+  // Tags
+  tags      Json @default("[]")
+  allergens Json @default("[]")
+
+  // Availability
+  isAvailable  Boolean @default(true) @map("is_available")
+  isFeatured   Boolean @default(false) @map("is_featured")
+  stockQuantity Int?   @map("stock_quantity")
+
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant        Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category      Category?                    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  customizations MenuItemCustomization[]
+  orderItems    OrderItem[]
+  reviews       MenuItemReview[]
+
+  @@unique([tenantId, slug])
+  @@map("menu_items")
+}
+
+model CustomizationGroup {
+  id            String  @id @default(uuid())
+  tenantId      String  @map("tenant_id")
+  name          String  // 'Size', 'Milk Type', 'Extras'
+  type          String  // 'single_select', 'multi_select'
+  isRequired    Boolean @default(false) @map("is_required")
+  minSelections Int     @default(0) @map("min_selections")
+  maxSelections Int?    @map("max_selections")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  options        CustomizationOption[]
+  menuItems      MenuItemCustomization[]
+
+  @@map("customization_groups")
+}
+
+model CustomizationOption {
+  id            String  @id @default(uuid())
+  groupId       String  @map("group_id")
+  name          String  // 'Large', 'Oat Milk', 'Extra Shot'
+  priceModifier Decimal @default(0.00) @map("price_modifier") @db.Decimal(10, 2)
+  isDefault     Boolean @default(false) @map("is_default")
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group CustomizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("customization_options")
+}
+
+model MenuItemCustomization {
+  menuItemId            String @map("menu_item_id")
+  customizationGroupId  String @map("customization_group_id")
+
+  menuItem           MenuItem           @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  customizationGroup CustomizationGroup @relation(fields: [customizationGroupId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, customizationGroupId])
+  @@map("menu_item_customizations")
+}
+
+// ============================================
+// ORDERS
+// ============================================
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique @map("order_number")
+
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  // Order details
+  orderType OrderType   @default(PICKUP) @map("order_type")
+  status    OrderStatus @default(PENDING)
+
+  // Pricing
+  subtotal         Decimal @map("subtotal") @db.Decimal(10, 2)
+  taxAmount        Decimal @default(0.00) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  loyaltyPointsUsed Int    @default(0) @map("loyalty_points_used")
+  loyaltyDiscount  Decimal @default(0.00) @map("loyalty_discount") @db.Decimal(10, 2)
+  totalAmount      Decimal @map("total_amount") @db.Decimal(10, 2)
+  currency         String  @default("TRY")
+
+  // Timing
+  scheduledFor       DateTime? @map("scheduled_for")
+  estimatedReadyTime DateTime? @map("estimated_ready_time")
+  readyAt            DateTime? @map("ready_at")
+  completedAt        DateTime? @map("completed_at")
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason") @db.Text
+
+  // Special instructions
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  user           User                @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+  payments       Payment[]
+  reviews        Review[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String  @map("order_id")
+  menuItemId  String? @map("menu_item_id")
+
+  // Snapshot of item at order time
+  itemName     String  @map("item_name")
+  itemImageUrl String? @map("item_image_url")
+  quantity     Int     @default(1)
+  unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
+
+  // Selected customizations
+  customizations Json @default("[]")
+
+  subtotal              Decimal @map("subtotal") @db.Decimal(10, 2)
+  specialInstructions   String? @map("special_instructions") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String      @map("order_id")
+  status    OrderStatus
+  changedBy String?     @map("changed_by")
+  notes     String?     @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_history")
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id       String @id @default(uuid())
+  orderId  String @map("order_id")
+  userId   String @map("user_id")
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("TRY")
+
+  paymentMethod         PaymentMethodType @map("payment_method")
+  paymentProvider       String?           @map("payment_provider")
+  providerTransactionId String?           @map("provider_transaction_id")
+
+  status PaymentStatus @default(PENDING)
+
+  // Card details (last 4 digits only)
+  cardLast4 String? @map("card_last4")
+  cardBrand String? @map("card_brand")
+
+  // Metadata
+  metadata Json?
+
+  // Refund
+  refundedAmount Decimal?  @default(0.00) @map("refunded_amount") @db.Decimal(10, 2)
+  refundedAt     DateTime? @map("refunded_at")
+  refundReason   String?   @map("refund_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("payments")
+}
+
+model SavedPaymentMethod {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+
+  type                   PaymentMethodType @map("type")
+  provider               String?
+  providerPaymentMethodId String?          @map("provider_payment_method_id")
+
+  cardLast4    String? @map("card_last4")
+  cardBrand    String? @map("card_brand")
+  cardExpMonth Int?    @map("card_exp_month")
+  cardExpYear  Int?    @map("card_exp_year")
+
+  isDefault Boolean @default(false) @map("is_default")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_payment_methods")
+}
+
+model UserWallet {
+  id       String  @id @default(uuid())
+  userId   String  @unique @map("user_id")
+  balance  Decimal @default(0.00) @db.Decimal(10, 2)
+  currency String  @default("TRY")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("user_wallets")
+}
+
+model WalletTransaction {
+  id           String  @id @default(uuid())
+  walletId     String  @map("wallet_id")
+  type         String  // 'credit', 'debit', 'refund'
+  amount       Decimal @db.Decimal(10, 2)
+  balanceAfter Decimal @map("balance_after") @db.Decimal(10, 2)
+  description  String? @db.Text
+  referenceType String? @map("reference_type") // 'order', 'topup', 'refund'
+  referenceId  String? @map("reference_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  wallet UserWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_transactions")
+}
+
+// ============================================
+// LOYALTY & REWARDS
+// ============================================
+
+model LoyaltyProgram {
+  id          String @id @default(uuid())
+  tenantId    String @unique @map("tenant_id")
+
+  name        String
+  description String? @db.Text
+
+  // Points rules
+  pointsPerCurrencyUnit Decimal @default(1.00) @map("points_per_currency_unit") @db.Decimal(5, 2)
+  pointsExpiryDays      Int     @default(365) @map("points_expiry_days")
+
+  // Tier thresholds (annual spending)
+  bronzeThreshold   Decimal @default(0.00) @map("bronze_threshold") @db.Decimal(10, 2)
+  silverThreshold   Decimal @default(500.00) @map("silver_threshold") @db.Decimal(10, 2)
+  goldThreshold     Decimal @default(1500.00) @map("gold_threshold") @db.Decimal(10, 2)
+  platinumThreshold Decimal @default(5000.00) @map("platinum_threshold") @db.Decimal(10, 2)
+
+  // Tier benefits (point multipliers)
+  bronzeMultiplier   Decimal @default(1.00) @map("bronze_multiplier") @db.Decimal(3, 2)
+  silverMultiplier   Decimal @default(1.25) @map("silver_multiplier") @db.Decimal(3, 2)
+  goldMultiplier     Decimal @default(1.50) @map("gold_multiplier") @db.Decimal(3, 2)
+  platinumMultiplier Decimal @default(2.00) @map("platinum_multiplier") @db.Decimal(3, 2)
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_programs")
+}
+
+model UserLoyalty {
+  id       String    @id @default(uuid())
+  userId   String    @map("user_id")
+  tenantId String    @map("tenant_id")
+
+  pointsBalance  Int @default(0) @map("points_balance")
+  lifetimePoints Int @default(0) @map("lifetime_points")
+
+  currentTier    TierLevel @default(BRONZE) @map("current_tier")
+  annualSpending Decimal   @default(0.00) @map("annual_spending") @db.Decimal(10, 2)
+
+  totalOrders Int     @default(0) @map("total_orders")
+  totalSpent  Decimal @default(0.00) @map("total_spent") @db.Decimal(10, 2)
+
+  tierUpdatedAt DateTime? @map("tier_updated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
+  @@unique([userId, tenantId])
+  @@map("user_loyalty")
+}
+
+model LoyaltyTransaction {
+  id            String    @id @default(uuid())
+  userLoyaltyId String    @map("user_loyalty_id")
+  orderId       String?   @map("order_id")
+
+  type         String  // 'earn', 'redeem', 'expire', 'adjust'
+  points       Int
+  balanceAfter Int     @map("balance_after")
+  description  String? @db.Text
+
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  userLoyalty UserLoyalty @relation(fields: [userLoyaltyId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_transactions")
+}
+
+model Reward {
+  id          String @id @default(uuid())
+  tenantId    String @map("tenant_id")
+
+  name        String
+  description String? @db.Text
+  imageUrl    String? @map("image_url")
+
+  pointsCost Int @map("points_cost")
+
+  // Reward type
+  rewardType String @map("reward_type") // 'free_item', 'discount_percentage', 'discount_fixed'
+
+  // For free_item type
+  freeMenuItemId String? @map("free_menu_item_id")
+
+  // For discount types
+  discountPercentage  Decimal? @map("discount_percentage") @db.Decimal(5, 2)
+  discountFixedAmount Decimal? @map("discount_fixed_amount") @db.Decimal(10, 2)
+  maxDiscountAmount   Decimal? @map("max_discount_amount") @db.Decimal(10, 2)
+
+  // Availability
+  isActive       Boolean   @default(true) @map("is_active")
+  availableFrom  DateTime? @map("available_from")
+  availableUntil DateTime? @map("available_until")
+
+  // Usage limits
+  maxRedemptionsPerUser Int? @map("max_redemptions_per_user")
+  totalRedemptionsLimit Int? @map("total_redemptions_limit")
+  currentRedemptions    Int  @default(0) @map("current_redemptions")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  redemptions RewardRedemption[]
+
+  @@map("rewards")
+}
+
+model RewardRedemption {
+  id        String @id @default(uuid())
+  rewardId  String @map("reward_id")
+  userId    String @map("user_id")
+  orderId   String? @map("order_id")
+
+  pointsSpent Int @map("points_spent")
+
+  // Generated code (for scanning at POS)
+  redemptionCode String @unique @map("redemption_code")
+
+  redeemedAt DateTime? @map("redeemed_at")
+  expiresAt  DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  reward Reward @relation(fields: [rewardId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("reward_redemptions")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id     String           @id @default(uuid())
+  userId String           @map("user_id")
+
+  type  NotificationType
+  title String
+  body  String           @db.Text
+
+  // Related entities
+  orderId  String? @map("order_id")
+  tenantId String? @map("tenant_id")
+
+  // Delivery
+  sentVia   Json    @default("[]") @map("sent_via") // ['push', 'email', 'sms']
+  pushSent  Boolean @default(false) @map("push_sent")
+  emailSent Boolean @default(false) @map("email_sent")
+  smsSent   Boolean @default(false) @map("sms_sent")
+
+  // Read status
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at")
+
+  // Additional data
+  data Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ============================================
+// REVIEWS & RATINGS
+// ============================================
+
+model Review {
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  tenantId   String  @map("tenant_id")
+  orderId    String? @map("order_id")
+
+  rating     Int     // 1-5
+  reviewText String? @map("review_text") @db.Text
+
+  // Photo uploads
+  photos Json @default("[]")
+
+  // Moderation
+  isApproved      Boolean @default(true) @map("is_approved")
+  isFlagged       Boolean @default(false) @map("is_flagged")
+  moderationNotes String? @map("moderation_notes") @db.Text
+
+  // Response from shop
+  responseText String?   @map("response_text") @db.Text
+  responseAt   DateTime? @map("response_at")
+
+  helpfulCount Int @default(0) @map("helpful_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order?  @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, orderId])
+  @@map("reviews")
+}
+
+model MenuItemReview {
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  menuItemId String  @map("menu_item_id")
+  orderId    String? @map("order_id")
+
+  rating     Int     // 1-5
+  reviewText String? @map("review_text") @db.Text
+  photos     Json    @default("[]")
+
+  isApproved   Boolean @default(true) @map("is_approved")
+  helpfulCount Int     @default(0) @map("helpful_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@map("menu_item_reviews")
+}
+
+// ============================================
+// PROMOTIONS & CAMPAIGNS
+// ============================================
+
+model Promotion {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+
+  code        String? @unique
+  name        String
+  description String? @db.Text
+
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
+  maxDiscountAmount Decimal? @map("max_discount_amount") @db.Decimal(10, 2)
+  minOrderAmount    Decimal? @map("min_order_amount") @db.Decimal(10, 2)
+
+  // Free item promotion
+  freeMenuItemId String? @map("free_menu_item_id")
+
+  // Validity
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+
+  // Usage limits
+  maxUses        Int? @map("max_uses")
+  maxUsesPerUser Int? @map("max_uses_per_user")
+  currentUses    Int  @default(0) @map("current_uses")
+
+  // Targeting
+  applicableTo   Json    @default("{}") @map("applicable_to") // Category IDs, menu item IDs
+  firstOrderOnly Boolean @default(false) @map("first_order_only")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usages PromotionUsage[]
+
+  @@map("promotions")
+}
+
+model PromotionUsage {
+  id          String @id @default(uuid())
+  promotionId String @map("promotion_id")
+  userId      String @map("user_id")
+  orderId     String @map("order_id")
+
+  discountAmount Decimal @map("discount_amount") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("promotion_usage")
+}

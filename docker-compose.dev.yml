@@ -1,0 +1,28 @@
+version: '3.8'
+
+# Development override for docker-compose
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  api:
+    build:
+      target: build
+    environment:
+      NODE_ENV: development
+      DB_LOGGING: "true"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /app/dist
+    command: npm run start:dev
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: coffeeapp-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP server
+      - "8025:8025" # Web UI
+    networks:
+      - coffeeapp-network

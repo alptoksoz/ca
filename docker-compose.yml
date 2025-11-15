@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: coffeeapp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coffeeapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - coffeeapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: coffeeapp-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - coffeeapp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: coffeeapp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/coffeeapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-super-secret-change-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - "3000:3000"
+    networks:
+      - coffeeapp-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run start:dev
+
+  # Prisma Studio (Database GUI) - Development only
+  prisma-studio:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: build
+    container_name: coffeeapp-prisma-studio
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/coffeeapp
+    ports:
+      - "5555:5555"
+    networks:
+      - coffeeapp-network
+    command: npx prisma studio
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  coffeeapp-network:
+    driver: bridge
