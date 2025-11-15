@@ -2,19 +2,27 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { TouchableOpacity } from 'react-native';
+import { useSelector } from 'react-redux';
+import { RootState } from '@app/store';
 import { colors } from '@/theme';
 
 // Screens
 import DiscoverScreen from '@/features/discover/screens/DiscoverScreen';
 import ShopDetailScreen from '@/features/discover/screens/ShopDetailScreen';
+import { MenuScreen } from '@/features/menu/screens/MenuScreen';
+import { MenuItemDetailScreen } from '@/features/menu/screens/MenuItemDetailScreen';
+import { CartScreen } from '@/features/cart/screens/CartScreen';
+import { CheckoutScreen } from '@/features/cart/screens/CheckoutScreen';
 import OrderHistoryScreen from '@/features/orders/screens/OrderHistoryScreen';
+import { OrderTrackingScreen } from '@/features/orders/screens/OrderTrackingScreen';
 import ProfileScreen from '@/features/profile/screens/ProfileScreen';
 
 export type MainStackParamList = {
   Discover: undefined;
   ShopDetail: { slug: string };
-  Menu: { slug: string };
-  ItemDetail: { tenantSlug: string; itemSlug: string };
+  Menu: undefined;
+  MenuItemDetail: { item: any };
   Cart: undefined;
   Checkout: undefined;
   OrderTracking: { orderId: string };
@@ -43,11 +51,65 @@ const DiscoverStack = () => {
         component={ShopDetailScreen}
         options={{ title: 'Coffee Shop' }}
       />
+      <Stack.Screen
+        name="Menu"
+        component={MenuScreen}
+        options={({ navigation }) => ({
+          title: 'Menu',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Cart')}
+              style={{ marginRight: 16 }}
+            >
+              <Icon name="cart" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="MenuItemDetail"
+        component={MenuItemDetailScreen}
+        options={{ title: 'Customize' }}
+      />
+      <Stack.Screen
+        name="Cart"
+        component={CartScreen}
+        options={{ title: 'Cart' }}
+      />
+      <Stack.Screen
+        name="Checkout"
+        component={CheckoutScreen}
+        options={{ title: 'Checkout' }}
+      />
+      <Stack.Screen
+        name="OrderTracking"
+        component={OrderTrackingScreen}
+        options={{ title: 'Track Order' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+const OrdersStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="OrderHistory"
+        component={OrderHistoryScreen}
+        options={{ title: 'Orders' }}
+      />
+      <Stack.Screen
+        name="OrderTracking"
+        component={OrderTrackingScreen}
+        options={{ title: 'Track Order' }}
+      />
     </Stack.Navigator>
   );
 };
 
 const MainNavigator = () => {
+  const cartItemsCount = useSelector((state: RootState) => state.cart.items.length);
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -71,9 +133,9 @@ const MainNavigator = () => {
       />
       <Tab.Screen
         name="OrdersTab"
-        component={OrderHistoryScreen}
+        component={OrdersStack}
         options={{
-          title: 'Orders',
+          headerShown: false,
           tabBarLabel: 'Orders',
           tabBarIcon: ({ color, size }) => (
             <Icon name="receipt" size={size} color={color} />
