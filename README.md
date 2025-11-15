@@ -182,6 +182,75 @@ Response:
 }
 ```
 
+### Tenants - Coffee Shops (`/api/v1/tenants`)
+
+**Public Endpoints** (No auth required):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/tenants` | Get all coffee shops (with pagination) |
+| GET | `/tenants/nearby?latitude=X&longitude=Y&radius=5` | Find nearby coffee shops |
+| GET | `/tenants/:slug` | Get coffee shop details by slug |
+| GET | `/tenants/:slug/open` | Check if coffee shop is open now |
+
+**Example: Get all coffee shops**
+```bash
+curl "http://localhost:3000/api/v1/tenants?page=1&limit=10"
+```
+
+**Example: Find nearby coffee shops**
+```bash
+curl "http://localhost:3000/api/v1/tenants/nearby?latitude=40.9923307&longitude=29.0259588&radius=5"
+```
+
+**Example: Get coffee shop details**
+```bash
+curl "http://localhost:3000/api/v1/tenants/nostaljik-kahve"
+```
+
+**Admin Endpoints** (`/api/v1/admin/tenants`) - Requires authentication:
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| POST | `/admin/tenants` | Create new coffee shop | Any |
+| GET | `/admin/tenants/:id` | Get coffee shop by ID | Admin, Owner |
+| PATCH | `/admin/tenants/:id` | Update coffee shop info | Admin, Owner |
+| PATCH | `/admin/tenants/:id/branding` | Update branding | Admin, Owner |
+| GET | `/admin/tenants/:id/statistics` | Get statistics | Admin, Owner, Manager |
+| DELETE | `/admin/tenants/:id` | Delete coffee shop | Admin, Owner |
+
+**Example: Create coffee shop** (requires auth token)
+```bash
+curl -X POST http://localhost:3000/api/v1/admin/tenants \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "businessName": "Nostaljik Kahve Evi",
+    "slug": "nostaljik-kahve",
+    "email": "info@nostaljiikkahve.com",
+    "phone": "+905551234567",
+    "city": "Istanbul",
+    "state": "Kadıköy",
+    "latitude": 40.9923307,
+    "longitude": 29.0259588,
+    "description": "Sıcak ve samimi atmosferde özel kahve deneyimi"
+  }'
+```
+
+**Example: Update branding**
+```bash
+curl -X PATCH http://localhost:3000/api/v1/admin/tenants/TENANT_ID/branding \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "primaryColor": "#6F4E37",
+    "secondaryColor": "#A0826D",
+    "accentColor": "#E6BE8A",
+    "fontFamily": "Poppins",
+    "logoUrl": "https://example.com/logo.png"
+  }'
+```
+
 ## 🗄️ Database Schema
 
 The complete database schema is defined in `backend/prisma/schema.prisma` with 30+ tables including:

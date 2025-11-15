@@ -8,8 +8,12 @@ import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
 
+// Import database module
+import { PrismaModule } from './database/prisma.module';
+
 // Import feature modules
 import { AuthModule } from './modules/auth/auth.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
 
 @Module({
   imports: [
@@ -20,10 +24,13 @@ import { AuthModule } from './modules/auth/auth.module';
       envFilePath: ['.env.local', '.env'],
     }),
 
+    // Database
+    PrismaModule,
+
     // Feature modules
     AuthModule,
+    TenantsModule,
     // UsersModule,
-    // TenantsModule,
     // MenusModule,
     // OrdersModule,
     // etc.
