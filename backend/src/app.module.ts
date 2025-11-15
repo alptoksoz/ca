@@ -14,6 +14,8 @@ import { PrismaModule } from './database/prisma.module';
 // Import feature modules
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { MenusModule } from './modules/menus/menus.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -30,9 +32,10 @@ import { TenantsModule } from './modules/tenants/tenants.module';
     // Feature modules
     AuthModule,
     TenantsModule,
+    MenusModule,
+    OrdersModule,
     // UsersModule,
-    // MenusModule,
-    // OrdersModule,
+    // PaymentsModule,
     // etc.
   ],
   controllers: [AppController],
